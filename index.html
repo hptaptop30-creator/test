@@ -6872,6 +6872,69 @@ function _normalizeMojibakeDeep(value, seen){
   });
   return value;
 }
+function _normalizeMojibakeDom(root){
+  if(!root || typeof document==='undefined') return;
+  const textNodes=[];
+  try{
+    const walker=document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while(walker.nextNode()) textNodes.push(walker.currentNode);
+  }catch(_){
+    return;
+  }
+  textNodes.forEach(function(node){
+    const original=node.nodeValue;
+    const fixed=_decodeMojibake(original);
+    if(fixed && fixed!==original) node.nodeValue=fixed;
+  });
+  const attrs=['placeholder','title','aria-label','value'];
+  const elements=root.nodeType===1 ? [root].concat(Array.from(root.querySelectorAll('*'))) : Array.from(root.querySelectorAll ? root.querySelectorAll('*') : []);
+  elements.forEach(function(el){
+    attrs.forEach(function(attr){
+      if(!el.hasAttribute || !el.hasAttribute(attr)) return;
+      const original=el.getAttribute(attr);
+      const fixed=_decodeMojibake(original);
+      if(fixed && fixed!==original) el.setAttribute(attr,fixed);
+    });
+  });
+}
+function _installMojibakeDomGuard(){
+  if(typeof document==='undefined' || !document.body || window.__dtMojibakeDomGuardInstalled) return;
+  window.__dtMojibakeDomGuardInstalled=true;
+  _normalizeMojibakeDom(document.body);
+  try{
+    const observer=new MutationObserver(function(mutations){
+      mutations.forEach(function(mutation){
+        if(mutation.type==='characterData' && mutation.target){
+          const original=mutation.target.nodeValue;
+          const fixed=_decodeMojibake(original);
+          if(fixed && fixed!==original) mutation.target.nodeValue=fixed;
+          return;
+        }
+        if(mutation.type==='attributes' && mutation.target){
+          _normalizeMojibakeDom(mutation.target);
+          return;
+        }
+        if(mutation.addedNodes && mutation.addedNodes.length){
+          mutation.addedNodes.forEach(function(node){
+            if(node && (node.nodeType===1 || node.nodeType===11)) _normalizeMojibakeDom(node);
+            if(node && node.nodeType===3){
+              const original=node.nodeValue;
+              const fixed=_decodeMojibake(original);
+              if(fixed && fixed!==original) node.nodeValue=fixed;
+            }
+          });
+        }
+      });
+    });
+    observer.observe(document.body,{
+      childList:true,
+      subtree:true,
+      characterData:true,
+      attributes:true,
+      attributeFilter:['placeholder','title','aria-label','value']
+    });
+  }catch(_){}
+}
 [
   APP_CONFIG,
   LANGS,
@@ -6888,6 +6951,13 @@ function _normalizeMojibakeDeep(value, seen){
   NAMES_BENEFIT,
   ASMA
 ].forEach(item=>_normalizeMojibakeDeep(item));
+if(typeof document!=='undefined'){
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',_installMojibakeDomGuard,{once:true});
+  }else{
+    _installMojibakeDomGuard();
+  }
+}
 
 function buildNames(){
   const nb=NAMES_BENEFIT[lang]||NAMES_BENEFIT.hi;
