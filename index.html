@@ -4481,7 +4481,6 @@ function renderMosqueFinderList(items,lat,lon){
     </div>`;
   }).join('');
 }
-async function fetchNearbyMosques(lat,lon){
 function fetchWithTimeout(url,options,timeoutMs){
   const controller=new AbortController();
   const timer=setTimeout(function(){ controller.abort(); }, timeoutMs);
@@ -6849,7 +6848,7 @@ function _decodeMojibake(text){
     }
     try{
       const next=new TextDecoder('utf-8').decode(new Uint8Array(bytes));
-      if(!next || next===out || next.includes('�')) break;
+      if(!next || next===out || next.includes(' ')) break;
       out=next;
     }catch(e){
       break;
